@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playable Chess Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+
+        .chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            margin: 20px auto;
+            border: 2px solid black;
+        }
+
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            cursor: pointer;
+        }
+
+        .white {
+            background-color: #f0d9b5;
+        }
+
+        .black {
+            background-color: #b58863;
+        }
+
+        .highlight {
+            background-color: #caff70;
+        }
+    </style>
+</head>
+<body>
+    <h1>Playable Chess Game</h1>
+    <div class="chessboard" id="chessboard"></div>
+    <p id="status">White to move</p>
+
+    <script>
+        // Initial board setup with chess symbols
+        const initialBoard = [
+            ['♜', '♞', '♝', '♛', '♚', '♝', '♞', '♜'],
+            ['♟', '♟', '♟', '♟', '♟', '♟', '♟', '♟'],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['', '', '', '', '', '', '', ''],
+            ['♙', '♙', '♙', '♙', '♙', '♙', '♙', '♙'],
+            ['♖', '♘', '♗', '♕', '♔', '♗', '♘', '♖']
+        ];
+
+        const chessboard = document.getElementById('chessboard');
+        const status = document.getElementById('status');
+        let board = JSON.parse(JSON.stringify(initialBoard));
+        let selectedSquare = null;
+        let currentPlayer = 'white';
+
+        // Render the chessboard
+        function renderBoard() {
+            chessboard.innerHTML = '';
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square', (row + col) % 2 === 0 ? 'white' : 'black');
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    square.textContent = board[row][col];
+                    square.addEventListener('click', handleSquareClick);
+                    chessboard.appendChild(square);
+                }
+            }
+        }
+
+        // Handle square clicks
+        function handleSquareClick(e) {
+            const row = parseInt(e.target.dataset.row);
+            const col = parseInt(e.target.dataset.col);
+
+            if (selectedSquare) {
+                // Try to move the piece
+                const fromRow = parseInt(selectedSquare.dataset.row);
+                const fromCol = parseInt(selectedSquare.dataset.col);
+                if (isValidMove(fromRow, fromCol, row, col)) {
+                    board[row][col] = board[fromRow][fromCol];
+                    board[fromRow][fromCol] = '';
+                    switchPlayer();
+                }
+                selectedSquare.classList.remove('highlight');
+                selectedSquare = null;
+            } else {
+                // Select a piece
+                const piece = board[row][col];
+                if ((currentPlayer === 'white' && '♔♕♖♗♘♙'.includes(piece)) ||
+                    (currentPlayer === 'black' && '♚♛♜♝♞♟'.includes(piece))) {
+                    selectedSquare = e.target;
+                    selectedSquare.classList.add('highlight');
+                }
+            }
+
+            renderBoard();
+        }
+
+        // Validate moves (basic rules for all pieces)
+        function isValidMove(fromRow, fromCol, toRow, toCol) {
+            const piece = board[fromRow][fromCol];
+            const target = board[toRow][toCol];
+
+            // Prevent moving onto your own piece
+            if ((currentPlayer === 'white' && '♔♕♖♗♘♙'.includes(target)) ||
+                (currentPlayer === 'black' && '♚♛♜♝♞♟'.includes(target))) {
+                return false;
+            }
+
+            // Calculate movement deltas
+            const deltaRow = toRow - fromRow;
+            const deltaCol = toCol - fromCol;
+
+            // Pawn movement
+            if (piece === '♙' || piece === '♟') {
+                const direction = piece === '♙' ? -1 : 1;
+                if (deltaCol === 0 && deltaRow === direction && target === '') return true;
+                if (Math.abs(deltaCol) === 1 && deltaRow === direction && target !== '') return true;
+                return false;
+            }
+
+            // Rook movement
+            if (piece === '♖' || piece === '♜') {
+                return (deltaRow === 0 || deltaCol === 0) && isPathClear(fromRow, fromCol, toRow, toCol);
+            }
+
+            // Bishop movement
+            if (piece === '♗' || piece === '♝') {
+                return Math.abs(deltaRow) === Math.abs(deltaCol) && isPathClear(fromRow, fromCol, toRow, toCol);
+            }
+
+            // Queen movement
+            if (piece === '♕' || piece === '♛') {
+                return (
+                    (deltaRow === 0 || deltaCol === 0 || Math.abs(deltaRow) === Math.abs(deltaCol)) &&
+                    isPathClear(fromRow, fromCol, toRow, toCol)
+                );
+            }
+
+            // Knight movement
+            if (piece === '♘' || piece === '♞') {
+                return (Math.abs(deltaRow) === 2 && Math.abs(deltaCol) === 1) ||
+                       (Math.abs(deltaRow) === 1 && Math.abs(deltaCol) === 2);
+            }
+
+            // King movement
+            if (piece === '♔' || piece === '♚') {
+                return Math.abs(deltaRow) <= 1 && Math.abs(deltaCol) <= 1;
+            }
+
+            return false; // Invalid move for unsupported pieces
+        }
+
+        // Check if the path is clear (used for Rook, Bishop, Queen)
+        function isPathClear(fromRow, fromCol, toRow, toCol) {
+            const stepRow = Math.sign(toRow - fromRow);
+            const stepCol = Math.sign(toCol - fromCol);
+            let currentRow = fromRow + stepRow;
+            let currentCol = fromCol + stepCol;
+
+            while (currentRow !== toRow || currentCol !== toCol) {
+                if (board[currentRow][currentCol] !== '') return false;
+                currentRow += stepRow;
+                currentCol += stepCol;
+            }
+
+            return true;
+        }
+
+        // Switch the player's turn
+        function switchPlayer() {
+            currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+            status.textContent = `${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)} to move`;
+        }
+
+        renderBoard();
+    </script>
+</body>
+</html>
